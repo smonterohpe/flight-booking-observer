@@ -13,6 +13,14 @@
   flex-direction: column;
   padding: 16px 12px;
   transition: width 0.18s ease;
+  /* Fija la barra a la altura de la ventana, con su propio scroll,
+     para que el pie (idioma/tema) no dependa del scroll de la página
+     ni de lo larga que sea la pestaña activa (Zerto/About son más
+     largas que Bookings/Systems). */
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
 }
 
 .sidebar.is-collapsed { width: 68px; }
@@ -118,6 +126,10 @@
   border-radius: 8px;
   padding: 6px 0;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
   font-size: 15px;
 }
 

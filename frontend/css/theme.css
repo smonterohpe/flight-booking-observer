@@ -46,3 +46,5 @@ body {
   color: var(--text);
   transition: background 0.15s ease, color 0.15s ease;
 }
+
+svg.icon { width: 15px; height: 15px; flex-shrink: 0; }
