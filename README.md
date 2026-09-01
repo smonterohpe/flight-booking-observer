@@ -101,6 +101,12 @@ La consola quedará accesible en `http://IP_DE_ESTA_VM/`.
 
 ## Notas de arquitectura importantes
 
+- Chart.js se sirve como fichero local (`frontend/js/vendor/chart.umd.min.js`),
+  **no** desde un CDN externo. Esto es intencional: si la VM de esta consola
+  no tiene salida a internet (habitual en un entorno de laboratorio/demo
+  aislado), un CDN externo daría 404/timeout y las gráficas se quedarían
+  en blanco sin ningún error visible salvo en la consola del navegador.
+
 - Si tu ZVMA usa un `client_id` de Keycloak distinto a `zerto-client`,
   o expone los VPGs/VMs con nombres de campo distintos, ajusta
   `zerto-probe/config.py` y `zerto-probe/aggregator.py` respectivamente

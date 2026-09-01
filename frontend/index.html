@@ -87,7 +87,7 @@
             </div>
             <div class="kpi-card">
               <span class="kpi-card__label" data-i18n="kpi.lastBooking">Última reserva hace</span>
-              <span class="kpi-card__value kpi-card__value--accent" id="kpiLastBooking">—</span>
+              <span class="kpi-card__value" id="kpiLastBooking">—</span>
             </div>
             <div class="kpi-card">
               <span class="kpi-card__label" data-i18n="kpi.avgPerDay">Media reservas/día</span>
@@ -97,17 +97,23 @@
 
           <div class="card">
             <h2 data-i18n="chart.timeline">Reservas por minuto (timeline)</h2>
-            <canvas id="timelineChart" height="90"></canvas>
+            <div class="chart-container">
+              <canvas id="timelineChart"></canvas>
+            </div>
           </div>
 
           <div class="card-grid">
             <div class="card">
               <h2 data-i18n="chart.cumulative">Ingresos acumulados</h2>
-              <canvas id="cumulativeChart" height="140"></canvas>
+              <div class="chart-container chart-container--small">
+                <canvas id="cumulativeChart"></canvas>
+              </div>
             </div>
             <div class="card">
               <h2 data-i18n="chart.hourly">Distribución por hora</h2>
-              <canvas id="hourlyChart" height="140"></canvas>
+              <div class="chart-container chart-container--small">
+                <canvas id="hourlyChart"></canvas>
+              </div>
             </div>
           </div>
 
@@ -172,11 +178,8 @@
             </div>
           </div>
 
-          <div class="card">
-            <h2 data-i18n="about.archTitle">Arquitectura</h2>
-            <div id="archDiagram" class="arch-diagram">
-              <!-- generado por JS -->
-            </div>
+          <div id="archDiagramContainer">
+            <!-- generado por JS: dos tarjetas (flujo de negocio + flujo de observabilidad) -->
           </div>
 
         </section>
@@ -185,7 +188,7 @@
     </div>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+  <script src="js/vendor/chart.umd.min.js"></script>
   <script src="js/i18n/es.js"></script>
   <script src="js/i18n/pt.js"></script>
   <script src="js/i18n/en.js"></script>

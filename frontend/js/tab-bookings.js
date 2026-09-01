@@ -21,6 +21,7 @@ const TabBookings = (() => {
   let cumulativeChart = null;
   let hourlyChart = null;
   let freshness = null;
+  let lastBookingAt = null;   // Date del último booking conocido (o null si aún no sabemos)
 
   function chartColors() {
     const styles = getComputedStyle(document.documentElement);
@@ -73,14 +74,40 @@ const TabBookings = (() => {
     });
   }
 
-  function humanMinutesAgo(minutes) {
-    if (minutes === null || minutes === undefined) return "—";
-    if (minutes < 1) return "<1 min";
-    if (minutes < 60) return `${Math.round(minutes)} min`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours} h`;
-    return `${Math.floor(hours / 24)} d`;
+  function formatExactElapsed(ms) {
+    const totalSeconds = Math.max(Math.floor(ms / 1000), 0);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    if (days > 0) return `${days}d ${hours}h`;
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    if (minutes > 0) return `${minutes}m ${seconds}s`;
+    return `${seconds}s`;
   }
+
+  function urgencyClass(totalMinutes) {
+    if (totalMinutes >= 5) return "kpi-card__value--danger";
+    if (totalMinutes >= 3) return "kpi-card__value--warning";
+    return "kpi-card__value--accent";
+  }
+
+  function renderLastBooking() {
+    const el = document.getElementById("kpiLastBooking");
+    if (!lastBookingAt) {
+      el.textContent = "—";
+      el.className = "kpi-card__value";
+      return;
+    }
+    const elapsedMs = Date.now() - lastBookingAt.getTime();
+    el.textContent = formatExactElapsed(elapsedMs);
+    el.className = `kpi-card__value ${urgencyClass(elapsedMs / 60000)}`;
+  }
+
+  // Recalcula el contador cada segundo, independientemente del ciclo de
+  // refresco de 5s de la API — así el color y el texto son exactos.
+  setInterval(renderLastBooking, 1000);
 
   async function loadKpis() {
     try {
@@ -88,8 +115,10 @@ const TabBookings = (() => {
       document.getElementById("kpiTotalBookings").textContent = summary.total_bookings.toLocaleString();
       document.getElementById("kpiTotalRevenue").textContent =
         `€${summary.total_revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-      document.getElementById("kpiLastBooking").textContent = humanMinutesAgo(summary.minutes_since_last_booking);
       document.getElementById("kpiAvgPerDay").textContent = Math.round(summary.avg_bookings_per_day).toLocaleString();
+
+      lastBookingAt = summary.last_booking_at ? new Date(summary.last_booking_at) : null;
+      renderLastBooking();
       return true;
     } catch (err) {
       // No se sobrescriben los valores anteriores: se quedan en pantalla
@@ -97,6 +126,15 @@ const TabBookings = (() => {
       console.error("Error cargando KPIs:", err);
       return false;
     }
+  }
+
+  function formatAxisLabel(date) {
+    // Con rangos largos (>24h o "todos los datos") se incluye la fecha;
+    // con rangos cortos basta con la hora.
+    const spansMultipleDays = selectedRange.minutes === null || selectedRange.minutes > 1440;
+    return spansMultipleDays
+      ? date.toLocaleString([], { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+      : date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }
 
   async function loadCharts() {
@@ -112,14 +150,12 @@ const TabBookings = (() => {
     }
 
     const colors = chartColors();
-    const labels = points.map((p) => new Date(p.minute));
+    const labels = points.map((p) => formatAxisLabel(new Date(p.minute)));
     const bookingCounts = points.map((p) => p.bookings_count);
     const revenues = points.map((p) => p.revenue);
 
     // ---- Timeline (reservas + ingresos por minuto) ----
-    const timelineCtx = document.getElementById("timelineChart");
-    if (timelineChart) timelineChart.destroy();
-    timelineChart = new Chart(timelineCtx, {
+    timelineChart = upsertChart(timelineChart, "timelineChart", {
       data: {
         labels,
         datasets: [
@@ -149,9 +185,7 @@ const TabBookings = (() => {
     let cumulative = 0;
     const cumulativeData = revenues.map((r) => (cumulative += r));
 
-    const cumulativeCtx = document.getElementById("cumulativeChart");
-    if (cumulativeChart) cumulativeChart.destroy();
-    cumulativeChart = new Chart(cumulativeCtx, {
+    cumulativeChart = upsertChart(cumulativeChart, "cumulativeChart", {
       type: "line",
       data: {
         labels,
@@ -177,9 +211,7 @@ const TabBookings = (() => {
       hourlyRevenue[h] += p.revenue;
     });
 
-    const hourlyCtx = document.getElementById("hourlyChart");
-    if (hourlyChart) hourlyChart.destroy();
-    hourlyChart = new Chart(hourlyCtx, {
+    hourlyChart = upsertChart(hourlyChart, "hourlyChart", {
       data: {
         labels: Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, "0")}h`),
         datasets: [
@@ -208,9 +240,25 @@ const TabBookings = (() => {
     return true;
   }
 
+  // Crea el gráfico la primera vez; en refrescos posteriores actualiza
+  // los datos del gráfico YA EXISTENTE en vez de destruirlo y recrearlo
+  // (eso es lo que causaba la animación de entrada cada 5 segundos).
+  function upsertChart(existingChart, canvasId, config) {
+    if (!existingChart) {
+      return new Chart(document.getElementById(canvasId), config);
+    }
+    existingChart.data.labels = config.data.labels;
+    config.data.datasets.forEach((dataset, i) => {
+      Object.assign(existingChart.data.datasets[i], dataset);
+    });
+    existingChart.options = config.options;
+    existingChart.update("none"); // "none" = sin animación
+    return existingChart;
+  }
+
   function chartOptions(colors, dualAxis) {
     const scales = {
-      x: { grid: { color: colors.grid }, ticks: { color: colors.text, maxTicksLimit: 10 } },
+      x: { grid: { color: colors.grid }, ticks: { color: colors.text, maxTicksLimit: 8, maxRotation: 0, autoSkip: true } },
       y: { grid: { color: colors.grid }, ticks: { color: colors.text }, position: "left" },
     };
     if (dualAxis) {
@@ -219,6 +267,7 @@ const TabBookings = (() => {
     return {
       responsive: true,
       maintainAspectRatio: false,
+      animation: false,
       interaction: { mode: "index", intersect: false },
       plugins: { legend: { labels: { color: colors.text } } },
       scales,
