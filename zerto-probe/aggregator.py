@@ -19,10 +19,38 @@ def _first(d: dict, *keys, default=None):
     return default
 
 
+def _extract_number(value):
+    """
+    Normaliza un valor numérico que puede llegar como:
+      - int / float                → lo devuelve tal cual
+      - dict {"Value": N} o {"value": N}  → extrae N
+        (algunas versiones del ZVMA envuelven los números en objetos)
+      - str representando un número → lo convierte
+      - cualquier otra cosa        → devuelve None
+    """
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return value
+    if isinstance(value, dict):
+        # Prueba las variantes de nombre más comunes que usa la API de Zerto
+        for k in ("Value", "value", "Seconds", "seconds"):
+            if k in value and value[k] is not None:
+                try:
+                    return int(value[k])
+                except (TypeError, ValueError):
+                    pass
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _seconds_to_human(seconds) -> str:
+    seconds = _extract_number(seconds)
     if seconds is None:
         return "—"
-    seconds = int(seconds)
     if seconds < 60:
         return f"{seconds}s"
     minutes, secs = divmod(seconds, 60)
@@ -39,14 +67,14 @@ def _vpg_summary(vpg: dict) -> dict:
     status_label = describe_status(status_raw)
     is_meeting_sla = status_label not in ("NotMeetingSLA",)
 
-    actual_rpo = _first(vpg, "actualRPO", "ActualRPO", "actualRpoSeconds")
-    configured_rpo = _first(vpg, "configuredRpoSeconds", "ConfiguredRpoSeconds", default=300)
+    actual_rpo = _extract_number(_first(vpg, "actualRPO", "ActualRPO", "actualRpoSeconds"))
+    configured_rpo = _extract_number(_first(vpg, "configuredRpoSeconds", "ConfiguredRpoSeconds", default=300)) or 300
 
-    journal_history = _first(vpg, "journalHistoryInSeconds", "JournalHistory")
-    configured_journal = _first(vpg, "configuredJournalHistoryInSeconds", default=48 * 3600)
+    journal_history = _extract_number(_first(vpg, "journalHistoryInSeconds", "JournalHistory"))
+    configured_journal = _extract_number(_first(vpg, "configuredJournalHistoryInSeconds", default=48 * 3600)) or 48 * 3600
 
-    failsafe_history = _first(vpg, "failSafeHistoryInSeconds", "FailSafeHistory")
-    configured_failsafe = _first(vpg, "configuredFailSafeHistoryInSeconds", default=4 * 3600)
+    failsafe_history = _extract_number(_first(vpg, "failSafeHistoryInSeconds", "FailSafeHistory"))
+    configured_failsafe = _extract_number(_first(vpg, "configuredFailSafeHistoryInSeconds", default=4 * 3600)) or 4 * 3600
 
     return {
         "vpg_identifier": _first(vpg, "vpgIdentifier", "VpgIdentifier", "id"),
