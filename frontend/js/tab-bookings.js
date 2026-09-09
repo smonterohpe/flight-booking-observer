@@ -155,17 +155,35 @@ const TabBookings = (() => {
     const revenues = points.map((p) => p.revenue);
 
     // ---- Timeline (reservas + ingresos por minuto) ----
+    // Con rangos largos (>2h) hay demasiados puntos para barras —
+    // se solapan y forman un bloque sólido. En esos casos usamos
+    // área rellena, que es mucho más legible y visualmente más rica.
+    const useLine = points.length > 120;
+    const bookingsDataset = useLine
+      ? {
+          type: "line",
+          label: I18n.t("chart.bookings"),
+          data: bookingCounts,
+          borderColor: colors.primary,
+          backgroundColor: `color-mix(in srgb, ${colors.primary} 20%, transparent)`,
+          fill: true,
+          tension: 0.3,
+          pointRadius: 0,
+          yAxisID: "y",
+        }
+      : {
+          type: "bar",
+          label: I18n.t("chart.bookings"),
+          data: bookingCounts,
+          backgroundColor: colors.primary,
+          yAxisID: "y",
+        };
+
     timelineChart = upsertChart(timelineChart, "timelineChart", {
       data: {
         labels,
         datasets: [
-          {
-            type: "bar",
-            label: I18n.t("chart.bookings"),
-            data: bookingCounts,
-            backgroundColor: colors.primary,
-            yAxisID: "y",
-          },
+          bookingsDataset,
           {
             type: "line",
             label: I18n.t("chart.revenue"),
@@ -244,6 +262,16 @@ const TabBookings = (() => {
   // los datos del gráfico YA EXISTENTE en vez de destruirlo y recrearlo
   // (eso es lo que causaba la animación de entrada cada 5 segundos).
   function upsertChart(existingChart, canvasId, config) {
+    // Si el tipo del primer dataset cambió (barras ↔ línea según el
+    // rango seleccionado), hay que destruir y recrear el gráfico —
+    // Chart.js no permite cambiar el tipo de un dataset en caliente.
+    const newType = config.data?.datasets?.[0]?.type ?? config.type;
+    const oldType = existingChart?.data?.datasets?.[0]?.type ?? existingChart?.config?.type;
+    if (existingChart && newType && oldType && newType !== oldType) {
+      existingChart.destroy();
+      existingChart = null;
+    }
+
     if (!existingChart) {
       return new Chart(document.getElementById(canvasId), config);
     }
@@ -252,7 +280,7 @@ const TabBookings = (() => {
       Object.assign(existingChart.data.datasets[i], dataset);
     });
     existingChart.options = config.options;
-    existingChart.update("none"); // "none" = sin animación
+    existingChart.update("none");
     return existingChart;
   }
 
