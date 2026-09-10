@@ -34,6 +34,7 @@ window.I18N_ES = {
 
   "chart.timeline": "Reservas por minuto (timeline)",
   "chart.cumulative": "Ingresos acumulados",
+  "chart.cumulativeHint": "Haz clic en 2 puntos para calcular el revenue entre ellos",
   "chart.hourly": "Distribución por hora",
   "chart.bookings": "Reservas",
   "chart.revenue": "Ingresos (€)",

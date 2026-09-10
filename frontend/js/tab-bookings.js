@@ -21,7 +21,9 @@ const TabBookings = (() => {
   let cumulativeChart = null;
   let hourlyChart = null;
   let freshness = null;
-  let lastBookingAt = null;   // Date del último booking conocido (o null si aún no sabemos)
+  let lastBookingAt = null;
+  let cumulativeSelectedPoints = []; // Punto A y Punto B para el delta
+  let currentFromIso = new Date(0).toISOString(); // rango activo actual
 
   function chartColors() {
     const styles = getComputedStyle(document.documentElement);
@@ -108,6 +110,53 @@ const TabBookings = (() => {
   // Recalcula el contador cada segundo, independientemente del ciclo de
   // refresco de 5s de la API — así el color y el texto son exactos.
   setInterval(renderLastBooking, 1000);
+
+  function fmtEur(value) {
+    return `€${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+
+  function renderDeltaPanel() {
+    const panel = document.getElementById("deltaPanel");
+    if (!panel) return;
+
+    if (cumulativeSelectedPoints.length === 0) {
+      panel.innerHTML = "";
+      panel.style.display = "none";
+      return;
+    }
+
+    const a = cumulativeSelectedPoints[0];
+    const b = cumulativeSelectedPoints[1] || null;
+
+    let html = `
+      <div class="delta-point">
+        <span class="delta-point__label">Punto A · ${a.label}</span>
+        <span class="delta-point__value" style="color:#60a5fa">${fmtEur(a.value)}</span>
+      </div>`;
+
+    if (b) {
+      const delta = b.value - a.value;
+      html += `
+        <div class="delta-point">
+          <span class="delta-point__label">Punto B · ${b.label}</span>
+          <span class="delta-point__value" style="color:#f472b6">${fmtEur(b.value)}</span>
+        </div>
+        <div class="delta-result">
+          <span class="delta-result__label">Δ Revenue A → B</span>
+          <span class="delta-result__value">+${fmtEur(delta)}</span>
+        </div>`;
+    } else {
+      html += `
+        <div class="delta-point">
+          <span class="delta-point__label" style="color:var(--text-muted);font-size:12px">
+            Haz clic en otro punto para calcular el delta
+          </span>
+        </div>`;
+    }
+
+    panel.innerHTML = html;
+    panel.style.display = "grid";
+  }
 
   async function loadKpis(fromIso) {
     try {
@@ -214,13 +263,26 @@ const TabBookings = (() => {
       options: chartOptions(colors, true),
     });
 
-    // ---- Ingresos acumulados — color ámbar/naranja (como en la referencia) ----
+    // ---- Ingresos acumulados — color ámbar + selección de 2 puntos ----
     let cumulative = 0;
     const cumulativeData = revenues.map((r) => (cumulative += r));
     const amber = "#f59e0b";
     const amberFill = "rgba(245,158,11,0.15)";
 
-    cumulativeChart = upsertChart(cumulativeChart, "cumulativeChart", {
+    // Radios y colores de los puntos: normalmente invisibles,
+    // grandes y llamativos en los dos puntos seleccionados.
+    const pointRadii = cumulativeData.map((_, i) => {
+      if (cumulativeSelectedPoints[0]?.index === i) return 7;
+      if (cumulativeSelectedPoints[1]?.index === i) return 7;
+      return 0;
+    });
+    const pointColors = cumulativeData.map((_, i) => {
+      if (cumulativeSelectedPoints[0]?.index === i) return "#60a5fa"; // azul: Punto A
+      if (cumulativeSelectedPoints[1]?.index === i) return "#f472b6"; // rosa: Punto B
+      return amber;
+    });
+
+    const cumulativeConfig = {
       type: "line",
       data: {
         labels,
@@ -231,11 +293,33 @@ const TabBookings = (() => {
           backgroundColor: amberFill,
           fill: true,
           tension: 0.25,
-          pointRadius: 0,
+          pointRadius: pointRadii,
+          pointBackgroundColor: pointColors,
         }],
       },
-      options: chartOptions(colors, false),
-    });
+      options: {
+        ...chartOptions(colors, false),
+        onClick: (event, elements, chart) => {
+          if (!elements.length) return;
+          const idx = elements[0].index;
+
+          // Al 3er clic, reinicia la selección
+          if (cumulativeSelectedPoints.length >= 2) {
+            cumulativeSelectedPoints = [];
+          }
+          cumulativeSelectedPoints.push({
+            index: idx,
+            label: chart.data.labels[idx],
+            value: chart.data.datasets[0].data[idx],
+          });
+          renderDeltaPanel();
+          // Fuerza recarga de la gráfica para pintar los puntos marcados
+          loadCharts(currentFromIso);
+        },
+      },
+    };
+
+    cumulativeChart = upsertChart(cumulativeChart, "cumulativeChart", cumulativeConfig);
 
     // ---- Distribución por hora del día ----
     const hourlyBookings = new Array(24).fill(0);
@@ -323,6 +407,7 @@ const TabBookings = (() => {
     const fromIso = selectedRange.minutes
       ? new Date(Date.now() - selectedRange.minutes * 60000).toISOString()
       : new Date(0).toISOString();
+    currentFromIso = fromIso;
 
     const [kpisOk, chartsOk] = await Promise.all([loadKpis(fromIso), loadCharts(fromIso)]);
     if (kpisOk && chartsOk) {

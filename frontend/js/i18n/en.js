@@ -34,6 +34,7 @@ window.I18N_EN = {
 
   "chart.timeline": "Bookings per minute (timeline)",
   "chart.cumulative": "Cumulative revenue",
+  "chart.cumulativeHint": "Click 2 points to calculate revenue between them",
   "chart.hourly": "Hourly distribution",
   "chart.bookings": "Bookings",
   "chart.revenue": "Revenue (€)",

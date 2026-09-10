@@ -102,18 +102,19 @@
             </div>
           </div>
 
-          <div class="card-grid">
-            <div class="card">
-              <h2 data-i18n="chart.cumulative">Ingresos acumulados</h2>
-              <div class="chart-container chart-container--small">
-                <canvas id="cumulativeChart"></canvas>
-              </div>
+          <div class="card">
+            <h2 data-i18n="chart.cumulative">Ingresos acumulados</h2>
+            <p class="card__subtitle" data-i18n="chart.cumulativeHint">Haz clic en 2 puntos para calcular el revenue entre ellos</p>
+            <div class="chart-container">
+              <canvas id="cumulativeChart"></canvas>
             </div>
-            <div class="card">
-              <h2 data-i18n="chart.hourly">Distribución por hora</h2>
-              <div class="chart-container chart-container--small">
-                <canvas id="hourlyChart"></canvas>
-              </div>
+            <div id="deltaPanel" class="delta-panel"></div>
+          </div>
+
+          <div class="card">
+            <h2 data-i18n="chart.hourly">Distribución por hora</h2>
+            <div class="chart-container chart-container--small">
+              <canvas id="hourlyChart"></canvas>
             </div>
           </div>
 
