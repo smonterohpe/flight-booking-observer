@@ -137,53 +137,70 @@ const TabBookings = (() => {
       : date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }
 
+  // Agrupa puntos en buckets de N minutos para que las barras sean
+  // individualmente visibles aunque haya muchos datos.
+  function aggregateBuckets(points, bucketMinutes) {
+    if (bucketMinutes <= 1) return points;
+    const bucketMs = bucketMinutes * 60000;
+    const map = new Map();
+    points.forEach((p) => {
+      const t = new Date(p.minute).getTime();
+      const key = Math.floor(t / bucketMs) * bucketMs;
+      if (!map.has(key)) {
+        map.set(key, { minute: new Date(key).toISOString(), bookings_count: 0, revenue: 0 });
+      }
+      map.get(key).bookings_count += p.bookings_count;
+      map.get(key).revenue += p.revenue;
+    });
+    return [...map.values()].sort((a, b) => new Date(a.minute) - new Date(b.minute));
+  }
+
+  // Elige el tamaño de bucket según el número de puntos:
+  //  ≤ 60 puntos  → sin agrupación (barras por minuto)
+  //  ≤ 360 puntos → buckets de 5 min  (≈ 60-70 barras visibles)
+  //  ≤ 1440 puntos→ buckets de 15 min
+  //  > 1440       → buckets de 30 min
+  function chooseBucket(n) {
+    if (n <= 60) return 1;
+    if (n <= 360) return 5;
+    if (n <= 1440) return 15;
+    return 30;
+  }
+
   async function loadCharts() {
-    let points = [];
+    let rawPoints = [];
     try {
       const fromIso = selectedRange.minutes
         ? new Date(Date.now() - selectedRange.minutes * 60000).toISOString()
         : new Date(0).toISOString();
-      points = await Api.business.kpiTimeseries(fromIso);
+      rawPoints = await Api.business.kpiTimeseries(fromIso);
     } catch (err) {
       console.error("Error cargando serie temporal:", err);
       return false;
     }
+
+    const bucket = chooseBucket(rawPoints.length);
+    const points = aggregateBuckets(rawPoints, bucket);
 
     const colors = chartColors();
     const labels = points.map((p) => formatAxisLabel(new Date(p.minute)));
     const bookingCounts = points.map((p) => p.bookings_count);
     const revenues = points.map((p) => p.revenue);
 
-    // ---- Timeline (reservas + ingresos por minuto) ----
-    // Con rangos largos (>2h) hay demasiados puntos para barras —
-    // se solapan y forman un bloque sólido. En esos casos usamos
-    // área rellena, que es mucho más legible y visualmente más rica.
-    const useLine = points.length > 120;
-    const bookingsDataset = useLine
-      ? {
-          type: "line",
-          label: I18n.t("chart.bookings"),
-          data: bookingCounts,
-          borderColor: colors.primary,
-          backgroundColor: `color-mix(in srgb, ${colors.primary} 20%, transparent)`,
-          fill: true,
-          tension: 0.3,
-          pointRadius: 0,
-          yAxisID: "y",
-        }
-      : {
-          type: "bar",
-          label: I18n.t("chart.bookings"),
-          data: bookingCounts,
-          backgroundColor: colors.primary,
-          yAxisID: "y",
-        };
-
+    // ---- Timeline: siempre barras (ahora con buckets legibles) ----
     timelineChart = upsertChart(timelineChart, "timelineChart", {
       data: {
         labels,
         datasets: [
-          bookingsDataset,
+          {
+            type: "bar",
+            label: I18n.t("chart.bookings"),
+            data: bookingCounts,
+            backgroundColor: colors.primary,
+            yAxisID: "y",
+            barPercentage: 0.85,
+            categoryPercentage: 0.85,
+          },
           {
             type: "line",
             label: I18n.t("chart.revenue"),
@@ -192,16 +209,19 @@ const TabBookings = (() => {
             backgroundColor: "transparent",
             yAxisID: "y1",
             tension: 0.3,
-            pointRadius: 0,
+            pointRadius: 2,
+            pointBackgroundColor: colors.green,
           },
         ],
       },
       options: chartOptions(colors, true),
     });
 
-    // ---- Ingresos acumulados ----
+    // ---- Ingresos acumulados — color ámbar/naranja (como en la referencia) ----
     let cumulative = 0;
     const cumulativeData = revenues.map((r) => (cumulative += r));
+    const amber = "#f59e0b";
+    const amberFill = "rgba(245,158,11,0.15)";
 
     cumulativeChart = upsertChart(cumulativeChart, "cumulativeChart", {
       type: "line",
@@ -210,8 +230,8 @@ const TabBookings = (() => {
         datasets: [{
           label: I18n.t("chart.revenue"),
           data: cumulativeData,
-          borderColor: colors.primary,
-          backgroundColor: `color-mix(in srgb, ${colors.primary} 15%, transparent)`,
+          borderColor: amber,
+          backgroundColor: amberFill,
           fill: true,
           tension: 0.25,
           pointRadius: 0,
