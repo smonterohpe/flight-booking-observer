@@ -37,7 +37,13 @@ const Api = (() => {
     health: () => getJson(`${C.BUSINESS_API}/health`),
     ping: () => getJson(`${C.BUSINESS_API}/ping`),
     system: () => getJson(`${C.BUSINESS_API}/system`),
-    kpiSummary: () => getJson(`${C.BUSINESS_API}/kpis/summary`),
+    kpiSummary: (from, to) => {
+      const params = new URLSearchParams();
+      if (from) params.set("from", from);
+      if (to) params.set("to", to);
+      const qs = params.toString();
+      return getJson(`${C.BUSINESS_API}/kpis/summary${qs ? `?${qs}` : ""}`);
+    },
     kpiTimeseries: (from, to) => {
       const params = new URLSearchParams();
       if (from) params.set("from", from);

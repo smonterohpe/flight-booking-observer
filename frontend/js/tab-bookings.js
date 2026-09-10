@@ -109,9 +109,9 @@ const TabBookings = (() => {
   // refresco de 5s de la API — así el color y el texto son exactos.
   setInterval(renderLastBooking, 1000);
 
-  async function loadKpis() {
+  async function loadKpis(fromIso) {
     try {
-      const summary = await Api.business.kpiSummary();
+      const summary = await Api.business.kpiSummary(fromIso);
       document.getElementById("kpiTotalBookings").textContent = summary.total_bookings.toLocaleString();
       document.getElementById("kpiTotalRevenue").textContent =
         `€${summary.total_revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -167,12 +167,9 @@ const TabBookings = (() => {
     return 30;
   }
 
-  async function loadCharts() {
+  async function loadCharts(fromIso) {
     let rawPoints = [];
     try {
-      const fromIso = selectedRange.minutes
-        ? new Date(Date.now() - selectedRange.minutes * 60000).toISOString()
-        : new Date(0).toISOString();
       rawPoints = await Api.business.kpiTimeseries(fromIso);
     } catch (err) {
       console.error("Error cargando serie temporal:", err);
@@ -323,7 +320,11 @@ const TabBookings = (() => {
   }
 
   async function loadAll() {
-    const [kpisOk, chartsOk] = await Promise.all([loadKpis(), loadCharts()]);
+    const fromIso = selectedRange.minutes
+      ? new Date(Date.now() - selectedRange.minutes * 60000).toISOString()
+      : new Date(0).toISOString();
+
+    const [kpisOk, chartsOk] = await Promise.all([loadKpis(fromIso), loadCharts(fromIso)]);
     if (kpisOk && chartsOk) {
       freshness?.markSuccess();
     } else {
