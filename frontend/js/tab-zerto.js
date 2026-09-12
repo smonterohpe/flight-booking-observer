@@ -1,6 +1,47 @@
 const TabZerto = (() => {
   const statusBar = document.getElementById("zvmStatusBar");
   const cardGrid = document.getElementById("zertoCardGrid");
+  const ransomwareBanner = document.getElementById("ransomwareBanner");
+
+  // Palabras clave que Zerto usa en sus alertas de cifrado anómalo
+  const RANSOMWARE_KEYWORDS = [
+    "encrypt", "ransomware", "abnormal encryption", "encryption behavior"
+  ];
+
+  function detectRansomware(data) {
+    const allAlerts = [
+      ...(data.remote?.active_alerts || []),
+      ...(data.local?.active_alerts || []),
+    ];
+    return allAlerts.find((a) => {
+      const desc = (a.description || "").toLowerCase();
+      return RANSOMWARE_KEYWORDS.some((kw) => desc.includes(kw));
+    }) || null;
+  }
+
+  function renderRansomwareBanner(triggerAlert) {
+    if (!ransomwareBanner) return;
+    if (!triggerAlert) {
+      ransomwareBanner.style.display = "none";
+      return;
+    }
+
+    const warningIcon = `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+      <line x1="12" y1="9" x2="12" y2="13" stroke="#dc2626" stroke-width="2" stroke-linecap="round"/>
+      <line x1="12" y1="17" x2="12.01" y2="17" stroke="#dc2626" stroke-width="2" stroke-linecap="round"/>
+    </svg>`;
+
+    ransomwareBanner.innerHTML = `
+      ${warningIcon}
+      <span>
+        ⚠ POSSIBLE RANSOMWARE ATTACK DETECTED — CHECK EVENTS AND ALERTS IMMEDIATELY
+        <span class="ransomware-banner__detail">${triggerAlert.description}</span>
+      </span>
+      ${warningIcon}
+    `;
+    ransomwareBanner.style.display = "flex";
+  }
 
   function statusDot(ok) {
     return `<span class="status-dot ${ok ? "status-dot--ok" : "status-dot--error"}"></span>`;
@@ -130,6 +171,9 @@ const TabZerto = (() => {
     try {
       const data = await Api.zerto.data();
 
+      // Detecta alerta de ransomware ANTES de renderizar el resto
+      renderRansomwareBanner(detectRansomware(data));
+
       statusBar.innerHTML = `
         <span>${statusDot(data.remote.reachable)} ${data.remote.label}</span>
         <span>${statusDot(data.local.reachable)} ${data.local.label}</span>
@@ -137,6 +181,7 @@ const TabZerto = (() => {
 
       cardGrid.innerHTML = `${siteCard(data.remote)}${siteCard(data.local)}`;
     } catch (err) {
+      renderRansomwareBanner(null);
       statusBar.innerHTML = `<span>${statusDot(false)} ${I18n.t("common.unreachable")}</span>`;
       cardGrid.innerHTML = `<div class="card"><p>${I18n.t("common.unreachable")}</p></div>`;
       console.error("Error cargando datos de Zerto:", err);

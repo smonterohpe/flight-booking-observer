@@ -184,7 +184,44 @@
 .plain-row { display: flex; justify-content: space-between; font-size: 13px; padding: 5px 0; border-top: 1px solid var(--border); }
 .plain-row:first-of-type { border-top: none; margin-top: 4px; }
 
-/* ===================== ZERTO TAB ===================== */
+/* ===================== BANNER RANSOMWARE (Zerto tab) ===================== */
+.ransomware-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 24px;
+  background: #dc2626;
+  border-radius: 10px;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.03em;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(220, 38, 38, 0.45);
+  animation: ransomware-pulse 2s ease-in-out infinite;
+}
+
+.ransomware-banner svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  fill: #ffffff;
+}
+
+.ransomware-banner__detail {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  margin-top: 4px;
+  opacity: 0.88;
+  letter-spacing: 0;
+}
+
+@keyframes ransomware-pulse {
+  0%, 100% { box-shadow: 0 4px 20px rgba(220, 38, 38, 0.45); }
+  50%       { box-shadow: 0 4px 32px rgba(220, 38, 38, 0.85); }
+}
 .zvm-status-bar {
   display: flex;
   gap: 18px;
